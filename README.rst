@@ -23,6 +23,7 @@ To register authentication methods::
 
     def includeme(config):
         from pyramid_contextauth import get_authentication_policy
+        policy = get_authentication_policy(config)
         policy.register_context(
             Context,
             authenticated_userid,
