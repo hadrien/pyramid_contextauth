@@ -76,16 +76,36 @@ class TestPyramidContextAuth(unittest.TestCase):
 
         self.assertIsNone(policy._call_method(request, 0))
 
-    def test_call_method_no_method(self):
+    def test_call_method_no_authenticated_userid_method(self):
         A = self._get_context_class('A')
         request = mock.Mock()
         request.context = A()
         m0, m1, m2, m3, m4 = self._get_methods()
 
         policy = self._get_policy()
-        policy.register_context(A, None, m1, m2, m3, m4)
 
-        self.assertIsNone(policy._call_method(request, 0))
+        policy.register_context(A, None, m1, m2, m3, m4)
+        # should call CallbackAuthenticationPolicy.authenticated_userid_method
+        # wich rely on unauthenticated_id (m1)
+
+        self.assertEqual(m1.return_value, policy._call_method(request, 0))
+
+    def test_call_method_no_effective_principals(self):
+        A = self._get_context_class('A')
+        request = mock.Mock()
+        request.context = A()
+        m0, m1, m2, m3, m4 = self._get_methods()
+
+        policy = self._get_policy()
+
+        policy.register_context(A, None, m1, None, m3, m4)
+        # should call CallbackAuthenticationPolicy.authenticated_userid_method
+        # wich rely on unauthenticated_id (m1)
+
+        self.assertEqual(
+            ['system.Everyone', 'system.Authenticated', m1.return_value],
+            policy._call_method(request, 2)
+            )
 
     def test_authenticated_methods(self):
         A = self._get_context_class('A')

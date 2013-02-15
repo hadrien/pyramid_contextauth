@@ -52,6 +52,15 @@ class ContextBasedAuthenticationPolicy(CallbackAuthenticationPolicy):
         forget_method,
         ):
         log.debug('registering %s.', context_class)
+
+        sup = super(ContextBasedAuthenticationPolicy, self)
+
+        if not authenticated_userid_method:
+            authenticated_userid_method = sup.authenticated_userid
+
+        if not effective_principals_method:
+            effective_principals_method = sup.effective_principals
+
         self._context_methods[context_class] = (
             authenticated_userid_method,
             unauthenticated_userid_method,
