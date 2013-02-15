@@ -16,6 +16,7 @@ def includeme(config):
     config.set_authentication_policy(ContextBasedAuthenticationPolicy())
     # XXX Permit to override authorization policy via settings?
     config.set_authorization_policy(ACLAuthorizationPolicy())
+    config.commit()
 
 
 def get_authentication_policy(config):
