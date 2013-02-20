@@ -6,29 +6,34 @@ To register authentication methods::
 
     from pyramid.security import remember, forget
 
+
     class Context(object):
         pass
 
-    def authenticated_userid(request):
-        return unauthenticated_userid(request)
 
-    def unauthenticated_userid(request):
-        "A dummy example"
-        return request.POST.get('userid')
+    class ContextAuthenticationPolicy:
+        def authenticated_userid(self, request):
+            return unauthenticated_userid(request)
 
-    def effective_principals(request):
-        if unauthenticated_userid(request):
-            return ['User']
-        return []
+        def unauthenticated_userid(self, request):
+            "A dummy example"
+            return request.POST.get('userid')
+
+        def effective_principals(self, request):
+            if self.unauthenticated_userid(request):
+                return ['User']
+            return []
+
+        def remember(self, request, prinicpal, **kw):
+            return remember(request, prinicpal, **kw)
+
+        def forget(self, request):
+            return forget(request)
+
 
     def includeme(config):
         from pyramid_contextauth import get_authentication_policy
         policy = get_authentication_policy(config)
-        policy.register_context(
-            Context,
-            authenticated_userid,
-            unauthenticated_userid,
-            effective_principals,
-            remember,
-            forget
-            )
+        policy.register_context(Context, ContextAuthenticationPolicy)
+
+
