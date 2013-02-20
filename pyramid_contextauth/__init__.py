@@ -28,11 +28,7 @@ class IContextBasedAuthenticationPolicy(IAuthenticationPolicy):
     def register_context(
         self,
         context,
-        authenticated_userid_method,
-        unauthenticated_userid_method,
-        effective_principals_method,
-        remember_method,
-        forget_method,
+        auth_policy
         ):
         ""
 
@@ -41,42 +37,24 @@ class IContextBasedAuthenticationPolicy(IAuthenticationPolicy):
 class ContextBasedAuthenticationPolicy(CallbackAuthenticationPolicy):
 
     def __init__(self):
-        self._context_methods = {}
+        self._context_policies = {}
 
     def register_context(
         self,
         context_class,
-        authenticated_userid_method,
-        unauthenticated_userid_method,
-        effective_principals_method,
-        remember_method,
-        forget_method,
+        auth_policy,
         ):
         log.debug('registering %s.', context_class)
 
-        sup = super(ContextBasedAuthenticationPolicy, self)
+        self._context_policies[context_class] = auth_policy
 
-        if not authenticated_userid_method:
-            authenticated_userid_method = sup.authenticated_userid
-
-        if not effective_principals_method:
-            effective_principals_method = sup.effective_principals
-
-        self._context_methods[context_class] = (
-            authenticated_userid_method,
-            unauthenticated_userid_method,
-            effective_principals_method,
-            remember_method,
-            forget_method)
-
-    def _call_method(self, request, index, *args, **kwargs):
+    def _call_method(self, request, method_name, *args, **kwargs):
         try:
-            method = self._context_methods[request.context.__class__][index]
-        except KeyError:
+            policy = self._context_policies[request.context.__class__]
+            method = getattr(policy, method_name)
+        except (KeyError, AttributeError):
             return None
-        if method:
-            return method(request, *args, **kwargs)
-        return None
+        return method(request, *args, **kwargs)
 
     def authenticated_userid(self, request):
         """ Return the authenticated userid or ``None`` if no authenticated
@@ -85,7 +63,12 @@ class ContextBasedAuthenticationPolicy(CallbackAuthenticationPolicy):
         user (the user should not have been deleted); if a record associated
         with the current id does not exist in a persistent store, it should
         return ``None``."""
-        return self._call_method(request, 0)
+        try:
+            policy = self._context_policies[request.context.__class__]
+            return policy.authenticated_userid(request)
+        except (KeyError, AttributeError):
+            parent = super(ContextBasedAuthenticationPolicy, self)
+            return parent.authenticated_userid(request)
 
     def unauthenticated_userid(self, request):
         """ Return the *unauthenticated* userid.  This method performs the
@@ -93,7 +76,7 @@ class ContextBasedAuthenticationPolicy(CallbackAuthenticationPolicy):
         userid based only on data present in the request; it needn't (and
         shouldn't) check any persistent store to ensure that the user record
         related to the request userid exists."""
-        return self._call_method(request, 1)
+        return self._call_method(request, 'unauthenticated_userid')
 
     def effective_principals(self, request):
         """ Return a sequence representing the effective principals
@@ -102,7 +85,7 @@ class ContextBasedAuthenticationPolicy(CallbackAuthenticationPolicy):
         Authenticated. """
         cls = ContextBasedAuthenticationPolicy
         principals = super(cls, self).effective_principals(request)
-        extended = self._call_method(request, 2)
+        extended = self._call_method(request, 'effective_principals')
         if extended:
             principals.extend(extended)
         return principals
@@ -112,11 +95,11 @@ class ContextBasedAuthenticationPolicy(CallbackAuthenticationPolicy):
         principal named ``principal`` when set in a response.  An
         individual authentication policy and its consumers can decide
         on the composition and meaning of ``**kw.`` """
-        headers = self._call_method(request, 3, principal, **kw)
+        headers = self._call_method(request, 'remember', principal, **kw)
         return headers if headers else []
 
     def forget(self, request):
         """ Return a set of headers suitable for 'forgetting' the
         current user on subsequent requests. """
-        headers = self._call_method(request, 4)
+        headers = self._call_method(request, 'forget')
         return headers if headers else []

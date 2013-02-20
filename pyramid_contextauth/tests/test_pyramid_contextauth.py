@@ -32,41 +32,6 @@ class TestPyramidContextAuth(unittest.TestCase):
     def _get_context_class(self, name):
         return type(name, (object, ), {})
 
-    def _get_methods(self):
-        return (mock.Mock(), mock.Mock(), mock.Mock(), mock.Mock(),
-                mock.Mock())
-
-    def test_call_method(self):
-        A = self._get_context_class('A')
-
-        m0, m1, m2, m3, m4 = self._get_methods()
-
-        request = mock.Mock()
-        request.context = A()
-
-        policy = self._get_policy()
-
-        policy.register_context(A, m0, m1, m2, m3, m4)
-
-        # check if method index are consistent
-        for i in range(5):
-            methods = [m0, m1, m2, m3, m4]
-            # only method at index i must be called
-            result = policy._call_method(request, i)
-
-            self.assertEqual(methods[i].return_value, result)
-
-            methods[i].assert_called_once_with(request)
-
-            m = methods.pop(i)
-
-            for m in methods:
-                # check other methods have NOT been called
-                self.assertEqual(0, m.call_count)
-
-            # reset mock:
-            [_.reset_mock() for _ in [m0, m1, m2, m3, m4]]
-
     def test_call_method_no_context(self):
         A = self._get_context_class('A')
         request = mock.Mock()
@@ -74,68 +39,65 @@ class TestPyramidContextAuth(unittest.TestCase):
 
         policy = self._get_policy()
 
-        self.assertIsNone(policy._call_method(request, 0))
+        self.assertIsNone(policy._call_method(request, 'authenticated_userid'))
 
     def test_call_method_no_authenticated_userid_method(self):
         A = self._get_context_class('A')
         request = mock.Mock()
         request.context = A()
-        m0, m1, m2, m3, m4 = self._get_methods()
+        ctx_policy = type('Policy', (object, ), {})
 
         policy = self._get_policy()
 
-        policy.register_context(A, None, m1, m2, m3, m4)
-        # should call CallbackAuthenticationPolicy.authenticated_userid_method
-        # wich rely on unauthenticated_id (m1)
+        policy.register_context(A, ctx_policy)
 
-        self.assertEqual(m1.return_value, policy._call_method(request, 0))
+        self.assertEqual(None, policy.authenticated_userid(request))
 
     def test_call_method_no_effective_principals(self):
         A = self._get_context_class('A')
         request = mock.Mock()
         request.context = A()
-        m0, m1, m2, m3, m4 = self._get_methods()
+        ctx_policy = type('Policy', (object, ), {})
 
         policy = self._get_policy()
 
-        policy.register_context(A, None, m1, None, m3, m4)
+        policy.register_context(A, ctx_policy)
         # should call CallbackAuthenticationPolicy.authenticated_userid_method
         # wich rely on unauthenticated_id (m1)
 
-        self.assertEqual(
-            ['system.Everyone', 'system.Authenticated', m1.return_value],
-            policy._call_method(request, 2)
-            )
+        self.assertEqual(['system.Everyone'],
+                         policy.effective_principals(request))
 
     def test_authenticated_methods(self):
         A = self._get_context_class('A')
+        ctx_policy = mock.Mock()
         request = mock.Mock()
         request.context = A()
+
         policy = self._get_policy()
 
-        auth_method = mock.Mock()
+        policy.register_context(A, ctx_policy)
 
-        policy.register_context(A, auth_method, auth_method, None, None, None)
-
-        self.assertEqual(auth_method.return_value,
+        self.assertEqual(ctx_policy.authenticated_userid.return_value,
                          policy.authenticated_userid(request))
 
-        self.assertEqual(auth_method.return_value,
+        self.assertEqual(ctx_policy.unauthenticated_userid.return_value,
                          policy.unauthenticated_userid(request))
 
     def test_effective_principals(self):
         A = self._get_context_class('A')
         request = mock.Mock()
+        ctx_policy = mock.Mock()
         request.context = A()
         policy = self._get_policy()
 
-        effective_principals = mock.Mock()
-        effective_principals.return_value = ['1234567']
+        ctx_policy.unauthenticated_userid.return_value = '123'
+        ctx_policy.effective_principals.return_value = ['1234567']
 
-        policy.register_context(A, None, None, effective_principals, None,
-                                None)
+        policy.register_context(A, ctx_policy)
 
-        expected = ['system.Everyone', '1234567']
+        expected = ['system.Everyone', 'system.Authenticated', '123',
+                    '1234567']
         self.assertEqual(expected, policy.effective_principals(request))
 
     def test_remember_forget(self):
@@ -144,10 +106,11 @@ class TestPyramidContextAuth(unittest.TestCase):
         request.context = A()
         policy = self._get_policy()
 
-        method = mock.Mock()
-        method.return_value = ['Header']
+        ctx_policy = mock.Mock()
+        ctx_policy.forget.return_value = ['Header']
+        ctx_policy.remember.return_value = ['Header']
 
-        policy.register_context(A, None, None, None, method, method)
+        policy.register_context(A, ctx_policy)
 
         self.assertEqual(['Header'],
                          policy.remember(request,

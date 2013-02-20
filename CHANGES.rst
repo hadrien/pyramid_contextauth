@@ -1,3 +1,8 @@
+0.1.1
+-----
+
+* Changed ``register_context`` interface which breaks compatibility with 0.0.3
+
 0.0.3
 -----
 
