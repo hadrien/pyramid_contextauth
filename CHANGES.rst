@@ -1,3 +1,8 @@
+0.2
+---
+
+* Update dependencies by adding requirements files.
+
 0.1.1
 -----
 
