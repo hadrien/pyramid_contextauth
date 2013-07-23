@@ -1,3 +1,8 @@
+0.2.1
+-----
+
+* Adjust requirements files and dependencies.
+
 0.2
 ---
 
