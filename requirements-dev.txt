@@ -1,6 +1,4 @@
--r requirements.txt
+-r requirements-test.txt
 
 waitress
 ipdb
-
--e .
