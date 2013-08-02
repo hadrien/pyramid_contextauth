@@ -20,6 +20,7 @@ def includeme(config):
 
 
 def get_authentication_policy(config):
+    # XXX should received registry as param.
     return config.registry.getUtility(IAuthenticationPolicy)
 
 
@@ -39,20 +40,19 @@ class ContextBasedAuthenticationPolicy(CallbackAuthenticationPolicy):
     def __init__(self):
         self._context_policies = {}
 
-    def register_context(
-        self,
-        context_class,
-        auth_policy,
-        ):
-        log.debug('registering %s.', context_class)
-
+    def register_context(self, context_class, auth_policy):
+        log.debug('registering: policy=%s context_cls=%s ', auth_policy,
+                  context_class)
         self._context_policies[context_class] = auth_policy
 
     def _call_method(self, request, method_name, *args, **kwargs):
         try:
             policy = self._context_policies[request.context.__class__]
+            log.debug('authn_policy=%s, context=%s', policy, request.context)
             method = getattr(policy, method_name)
         except (KeyError, AttributeError):
+            log.debug('No authentication policy found: context=%s',
+                      request.context)
             return None
         return method(request, *args, **kwargs)
 
@@ -65,8 +65,10 @@ class ContextBasedAuthenticationPolicy(CallbackAuthenticationPolicy):
         return ``None``."""
         try:
             policy = self._context_policies[request.context.__class__]
+            log.debug('authn_policy=%s, context=%s', policy, request.context)
             return policy.authenticated_userid(request)
         except (KeyError, AttributeError):
+            log.debug('No authentication policy for %s', request.context)
             parent = super(ContextBasedAuthenticationPolicy, self)
             return parent.authenticated_userid(request)
 
