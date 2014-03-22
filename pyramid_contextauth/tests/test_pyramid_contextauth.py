@@ -25,6 +25,9 @@ class TestConfig(unittest.TestCase):
 
 class TestPyramidContextAuth(unittest.TestCase):
 
+    def setUp(self):
+        self.config = Configurator(settings={})
+
     def _get_policy(self):
         from pyramid_contextauth import ContextBasedAuthenticationPolicy
         return ContextBasedAuthenticationPolicy()
@@ -36,6 +39,7 @@ class TestPyramidContextAuth(unittest.TestCase):
         A = self._get_context_class('A')
         request = mock.Mock()
         request.context = A()
+        request.registry = self.config.registry
 
         policy = self._get_policy()
 
@@ -45,11 +49,12 @@ class TestPyramidContextAuth(unittest.TestCase):
         A = self._get_context_class('A')
         request = mock.Mock()
         request.context = A()
+        request.registry = self.config.registry
         ctx_policy = type('Policy', (object, ), {})
 
         policy = self._get_policy()
 
-        policy.register_context(A, ctx_policy)
+        policy.register_context(self.config, A, ctx_policy)
 
         self.assertEqual(None, policy.authenticated_userid(request))
 
@@ -57,11 +62,12 @@ class TestPyramidContextAuth(unittest.TestCase):
         A = self._get_context_class('A')
         request = mock.Mock()
         request.context = A()
+        request.registry = self.config.registry
         ctx_policy = type('Policy', (object, ), {})
 
         policy = self._get_policy()
 
-        policy.register_context(A, ctx_policy)
+        policy.register_context(self.config, A, ctx_policy)
         # should call CallbackAuthenticationPolicy.authenticated_userid_method
         # wich rely on unauthenticated_id (m1)
 
@@ -73,10 +79,11 @@ class TestPyramidContextAuth(unittest.TestCase):
         ctx_policy = mock.Mock()
         request = mock.Mock()
         request.context = A()
+        request.registry = self.config.registry
 
         policy = self._get_policy()
 
-        policy.register_context(A, ctx_policy)
+        policy.register_context(self.config, A, ctx_policy)
 
         self.assertEqual(ctx_policy.authenticated_userid.return_value,
                          policy.authenticated_userid(request))
@@ -89,12 +96,13 @@ class TestPyramidContextAuth(unittest.TestCase):
         request = mock.Mock()
         ctx_policy = mock.Mock()
         request.context = A()
+        request.registry = self.config.registry
         policy = self._get_policy()
 
         ctx_policy.unauthenticated_userid.return_value = '123'
         ctx_policy.effective_principals.return_value = ['1234567']
 
-        policy.register_context(A, ctx_policy)
+        policy.register_context(self.config, A, ctx_policy)
 
         expected = ['system.Everyone', 'system.Authenticated', '123',
                     '1234567']
@@ -104,13 +112,14 @@ class TestPyramidContextAuth(unittest.TestCase):
         A = self._get_context_class('A')
         request = mock.Mock()
         request.context = A()
+        request.registry = self.config.registry
         policy = self._get_policy()
 
         ctx_policy = mock.Mock()
         ctx_policy.forget.return_value = ['Header']
         ctx_policy.remember.return_value = ['Header']
 
-        policy.register_context(A, ctx_policy)
+        policy.register_context(self.config, A, ctx_policy)
 
         self.assertEqual(['Header'],
                          policy.remember(request,

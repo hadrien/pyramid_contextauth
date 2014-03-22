@@ -1,4 +1,7 @@
 import logging
+import collections
+
+import venusian
 
 from pyramid.interfaces import IAuthenticationPolicy
 from pyramid.authentication import CallbackAuthenticationPolicy
@@ -13,10 +16,38 @@ __all__ = ['get_authentication_policy']
 
 def includeme(config):
     log.info('Configuring.')
-    config.set_authentication_policy(ContextBasedAuthenticationPolicy())
-    # XXX Permit to override authorization policy via settings?
-    config.set_authorization_policy(ACLAuthorizationPolicy())
-    config.commit()
+    policy = config.registry.queryUtility(IContextBasedAuthenticationPolicy)
+    if policy is None:
+        ctx_policy = ContextBasedAuthenticationPolicy()
+        config.set_authentication_policy(ctx_policy)
+        # XXX Permit to override authorization policy via settings?
+        config.set_authorization_policy(ACLAuthorizationPolicy())
+        config.add_directive('register_authentication_policy',
+                             register_auth_policy,
+                             action_wrap=True)
+        config.commit()
+
+
+class authentication_policy(object):
+    """A decorator to register an authentication policy"""
+
+    def __init__(self, *context_cls_list):
+        self.context_cls_list = context_cls_list
+
+    def __call__(self, policy_cls):
+        self.policy_cls = policy_cls
+        self.info = venusian.attach(policy_cls, self.callback)
+        return policy_cls
+
+    def callback(self, context, name, ob):
+        config = context.config.with_package(self.info.module)
+        config.register_authentication_policy(self.policy_cls(),
+                                              self.context_cls_list)
+
+
+def register_auth_policy(config, policy, context_cls_list):
+    ctx_policy = config.registry.getUtility(IAuthenticationPolicy)
+    ctx_policy.register_context(config, context_cls_list, policy)
 
 
 def get_authentication_policy(config):
@@ -25,32 +56,36 @@ def get_authentication_policy(config):
 
 class IContextBasedAuthenticationPolicy(IAuthenticationPolicy):
 
-    def register_context(
-        self,
-        context,
-        auth_policy
-        ):
+    def register_context(self, context, auth_policy):
         ""
 
 
 @implementer(IContextBasedAuthenticationPolicy)
 class ContextBasedAuthenticationPolicy(CallbackAuthenticationPolicy):
 
-    def __init__(self):
-        self._context_policies = {}
+    def register_context(self, config, context_cls_list, auth_policy):
+        log.debug('registering auth_policy=%s for %s', auth_policy,
+                  context_cls_list)
+        registry = config.registry
+        if not isinstance(context_cls_list, collections.Iterable):
+            context_cls_list = (context_cls_list, )
 
-    def register_context(
-        self,
-        context_class,
-        auth_policy,
-        ):
-        log.debug('registering %s.', context_class)
+        def factory(context):
+            return auth_policy
 
-        self._context_policies[context_class] = auth_policy
+        for ctx in context_cls_list:
+            registry.registerAdapter(factory, required=[ctx],
+                                     provided=IAuthenticationPolicy)
+
+    def _get_policy(self, request):
+        registry = request.registry
+        return registry.queryAdapter(request.context, IAuthenticationPolicy)
 
     def _call_method(self, request, method_name, *args, **kwargs):
+        policy = self._get_policy(request)
+        if not policy:
+            return None
         try:
-            policy = self._context_policies[request.context.__class__]
             method = getattr(policy, method_name)
         except (KeyError, AttributeError):
             return None
@@ -63,10 +98,11 @@ class ContextBasedAuthenticationPolicy(CallbackAuthenticationPolicy):
         user (the user should not have been deleted); if a record associated
         with the current id does not exist in a persistent store, it should
         return ``None``."""
+        policy = self._get_policy(request)
         try:
-            policy = self._context_policies[request.context.__class__]
             return policy.authenticated_userid(request)
-        except (KeyError, AttributeError):
+        except AttributeError:
+            log.debug('No policy for context=%s', request.context)
             parent = super(ContextBasedAuthenticationPolicy, self)
             return parent.authenticated_userid(request)
 

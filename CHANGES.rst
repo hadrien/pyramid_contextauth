@@ -1,3 +1,18 @@
+Changelog
+=========
+
+0.3
+---
+
+* Break backward compatibility as
+  ``ContextBasedAuthenticationPolicy.register_context`` now requires ``config``
+  instance as first argument.
+* Add a configuration directive: ``config.register_authentication_policy``.
+* Use registry adpaters to register policies rather than a dict.
+* Add a decorator ``authentication_policy`` to register policies when doing
+  a config scan.
+* ``config.register_authentication_policy`` accepts a list of contexts.
+
 0.2
 ---
 
