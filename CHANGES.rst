@@ -4,7 +4,7 @@ Changelog
 Development
 -----------
 
-* Add introspectables for registered authentication policies.
+* Add introspectables to config for registered authentication policies.
 
 0.3
 ---
