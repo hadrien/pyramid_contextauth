@@ -63,12 +63,33 @@ class IContextBasedAuthenticationPolicy(IAuthenticationPolicy):
 @implementer(IContextBasedAuthenticationPolicy)
 class ContextBasedAuthenticationPolicy(CallbackAuthenticationPolicy):
 
+    intr_category = 'context based authentication policies'
+
     def register_context(self, config, context_cls_list, auth_policy):
         log.debug('registering auth_policy=%s for %s', auth_policy,
                   context_cls_list)
-        registry = config.registry
+
         if not isinstance(context_cls_list, collections.Iterable):
             context_cls_list = (context_cls_list, )
+
+        registry = config.registry
+        introspector = registry.introspector
+        policy_intr = introspector.get(self.intr_category, auth_policy)
+
+        if not policy_intr:
+            policy_intr = config.introspectable(
+                category_name=self.intr_category,
+                discriminator=auth_policy,
+                title=auth_policy,
+                type_name='authentication policy',
+            )
+            policy_intr['policy'] = auth_policy
+            policy_intr['contexts'] = []
+            config.action(None,
+                          introspectables=(policy_intr,),
+                          action_wrap=False)
+
+        policy_intr['contexts'].extend(context_cls_list)
 
         def factory(context):
             return auth_policy

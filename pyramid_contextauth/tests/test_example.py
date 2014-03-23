@@ -37,4 +37,27 @@ class TestConfig(unittest.TestCase):
         request.context = example.Context3()
 
         self.assertIsInstance(policy._get_policy(request),
-                              example.Context3Policy)
+                              example.Context345Policy)
+
+        request.context = example.Context4()
+
+        self.assertIsInstance(policy._get_policy(request),
+                              example.Context345Policy)
+
+        request.context = example.Context5()
+        self.assertIsInstance(policy._get_policy(request),
+                              example.Context345Policy)
+
+    def test_introspectables(self):
+        config = Configurator(settings={})
+        config.include('pyramid_contextauth')
+        config.include('example')
+        config.commit()
+
+        introspector = config.registry.introspector
+        category_name = 'context based authentication policies'
+
+        category = introspector.get_category(category_name)
+
+        self.assertEqual(3, len(category))
+
