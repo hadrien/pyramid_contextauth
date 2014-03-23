@@ -51,6 +51,7 @@ def register_auth_policy(config, policy, context_cls_list):
 
 
 def get_authentication_policy(config):
+    # XXX should received registry as param.
     return config.registry.getUtility(IAuthenticationPolicy)
 
 
@@ -109,6 +110,8 @@ class ContextBasedAuthenticationPolicy(CallbackAuthenticationPolicy):
         try:
             method = getattr(policy, method_name)
         except (KeyError, AttributeError):
+            log.debug('No authentication policy found: context=%s',
+                      request.context)
             return None
         return method(request, *args, **kwargs)
 
