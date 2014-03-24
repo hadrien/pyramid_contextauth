@@ -1,10 +1,11 @@
 Changelog
 =========
 
-Development
------------
+0.4
+---
 
 * Add introspectables to config for registered authentication policies.
+* Rename register_context to register_policy
 
 0.3
 ---

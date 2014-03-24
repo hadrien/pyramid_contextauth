@@ -24,7 +24,7 @@ def includeme(config):
         config.set_authorization_policy(ACLAuthorizationPolicy())
         config.add_directive('register_authentication_policy',
                              register_auth_policy,
-                             action_wrap=True)
+                             action_wrap=False)
         config.commit()
 
 
@@ -45,9 +45,9 @@ class authentication_policy(object):
                                               self.context_cls_list)
 
 
-def register_auth_policy(config, policy, context_cls_list):
+def register_auth_policy(config, auth_policy, context_cls_list):
     ctx_policy = config.registry.getUtility(IAuthenticationPolicy)
-    ctx_policy.register_context(config, context_cls_list, policy)
+    ctx_policy.register_policy(config, auth_policy, context_cls_list)
 
 
 def get_authentication_policy(config):
@@ -57,7 +57,7 @@ def get_authentication_policy(config):
 
 class IContextBasedAuthenticationPolicy(IAuthenticationPolicy):
 
-    def register_context(self, context, auth_policy):
+    def register_policy(self, auth_policy, context):
         ""
 
 
@@ -66,7 +66,7 @@ class ContextBasedAuthenticationPolicy(CallbackAuthenticationPolicy):
 
     intr_category = 'context based authentication policies'
 
-    def register_context(self, config, context_cls_list, auth_policy):
+    def register_policy(self, config, auth_policy, context_cls_list):
         log.debug('registering auth_policy=%s for %s', auth_policy,
                   context_cls_list)
 

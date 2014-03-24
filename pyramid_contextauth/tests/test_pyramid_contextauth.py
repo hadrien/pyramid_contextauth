@@ -54,7 +54,7 @@ class TestPyramidContextAuth(unittest.TestCase):
 
         policy = self._get_policy()
 
-        policy.register_context(self.config, A, ctx_policy)
+        policy.register_policy(self.config, ctx_policy, A)
 
         self.assertEqual(None, policy.authenticated_userid(request))
 
@@ -67,7 +67,7 @@ class TestPyramidContextAuth(unittest.TestCase):
 
         policy = self._get_policy()
 
-        policy.register_context(self.config, A, ctx_policy)
+        policy.register_policy(self.config, ctx_policy, A)
         # should call CallbackAuthenticationPolicy.authenticated_userid_method
         # wich rely on unauthenticated_id (m1)
 
@@ -83,7 +83,7 @@ class TestPyramidContextAuth(unittest.TestCase):
 
         policy = self._get_policy()
 
-        policy.register_context(self.config, A, ctx_policy)
+        policy.register_policy(self.config, ctx_policy, A)
 
         self.assertEqual(ctx_policy.authenticated_userid.return_value,
                          policy.authenticated_userid(request))
@@ -102,7 +102,7 @@ class TestPyramidContextAuth(unittest.TestCase):
         ctx_policy.unauthenticated_userid.return_value = '123'
         ctx_policy.effective_principals.return_value = ['1234567']
 
-        policy.register_context(self.config, A, ctx_policy)
+        policy.register_policy(self.config, ctx_policy, A)
 
         expected = ['system.Everyone', 'system.Authenticated', '123',
                     '1234567']
@@ -119,7 +119,7 @@ class TestPyramidContextAuth(unittest.TestCase):
         ctx_policy.forget.return_value = ['Header']
         ctx_policy.remember.return_value = ['Header']
 
-        policy.register_context(self.config, A, ctx_policy)
+        policy.register_policy(self.config, ctx_policy, A)
 
         self.assertEqual(['Header'],
                          policy.remember(request,
