@@ -3,8 +3,6 @@ from pyramid.authentication import (
     BasicAuthAuthenticationPolicy,
 )
 
-from pyramid_contextauth import authentication_policy
-
 
 def includeme(config):
     config.include('pyramid_contextauth')
@@ -19,7 +17,8 @@ def includeme(config):
         Context2,
     )
 
-    config.scan()
+    config.register_authentication_policy(Context345Policy(),
+                                          (Context3, Context4))
 
     config.commit()
 
@@ -44,10 +43,5 @@ class Context5(Context4):
     pass
 
 
-class ToBeRemovedPolicy(object):
-    pass
-
-
-@authentication_policy(contexts=(Context3, Context4))
 class Context345Policy(object):
     pass

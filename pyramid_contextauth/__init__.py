@@ -1,9 +1,6 @@
 import logging
 import collections
 
-import venusian
-
-from pyramid.config import ConfigurationError
 from pyramid.interfaces import IAuthenticationPolicy
 from pyramid.authentication import CallbackAuthenticationPolicy
 from pyramid.authorization import ACLAuthorizationPolicy
@@ -22,7 +19,7 @@ def includeme(config):
         log.info('Configuring')
         ctx_policy = ContextBasedAuthenticationPolicy()
         config.set_authentication_policy(ctx_policy)
-        # XXX Permit to override authorization policy via settings?
+        # TODO Permit to override authorization policy via settings.
         config.set_authorization_policy(ACLAuthorizationPolicy())
         config.add_directive('register_authentication_policy',
                              register_authentication_policy,
@@ -34,29 +31,6 @@ def includeme(config):
         log.info('Configured')
     else:
         log.info('Already configured')
-
-
-class authentication_policy(object):
-    """A decorator to register an authentication policy"""
-
-    def __init__(self, **settings):
-        if 'contexts' not in settings:
-            ConfigurationError('no contexts defined ')
-        self.__dict__.update(settings)
-
-    def __call__(self, policy_cls):
-        settings = self.__dict__.copy()
-        contexts = settings.pop('contexts')
-
-        def callback(context, name, ob):
-
-            config = context.config.with_package(info.module)
-            config.register_authentication_policy(policy_cls(), contexts,
-                                                  **settings)
-
-        info = venusian.attach(policy_cls, callback, depth=1)
-        settings['_info'] = info.codeinfo
-        return policy_cls
 
 
 def register_authentication_policy(config, auth_policy, context_cls_list):

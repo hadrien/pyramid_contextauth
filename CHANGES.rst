@@ -1,6 +1,12 @@
 Changelog
 =========
 
+0.6
+---
+
+* Removing decorator ``authentication_policy``: extension should not
+  instantiate authentication policy class internally.
+
 0.5
 ---
 

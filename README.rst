@@ -1,5 +1,5 @@
 pyramid_contextauth
-###################
+===================
 
 
 A simple pyramid extension to provides contexts based authentication policy.
@@ -9,14 +9,15 @@ Usage::
     from pyramid.security import remember, forget
     from pyramid.authentication import AuthTktAuthenticationPolicy,
 
-    from pyramid_contextauth import authentication_policy
-
-
     def includeme(config):
         config.include('pyramid_contextauth')
         config.register_authentication_policy(
             AuthTktAuthenticationPolicy('secret'),
             Context1,
+        )
+        config.register_authentication_policy(
+            ContextAuthenticationPolicy(),
+            (Context2, Context3),
         )
 
 
@@ -32,7 +33,6 @@ Usage::
         pass
 
 
-    @authentication_policy(contexts=(Context2, Context3))
     class ContextAuthenticationPolicy(object):
 
         def authenticated_userid(self, request):
