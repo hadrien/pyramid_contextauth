@@ -2,7 +2,7 @@
 pyramid_contextauth
 ===================
 
-.. image:: https://travis-ci.org/hadrien/pyramid_contextauth.svg
+.. image:: https://travis-ci.org/hadrien/pyramid_contextauth.png
    :target: https://travis-ci.org/hadrien/pyramid_contextauth
 
 .. image:: https://pypip.in/d/pyramid_contextauth/badge.png
