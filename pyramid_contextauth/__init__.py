@@ -3,11 +3,12 @@ import collections
 
 import venusian
 
+from pyramid.config import ConfigurationError
 from pyramid.interfaces import IAuthenticationPolicy
 from pyramid.authentication import CallbackAuthenticationPolicy
 from pyramid.authorization import ACLAuthorizationPolicy
 
-from zope.interface import implementer
+from zope.interface import implementer, implementedBy
 
 log = logging.getLogger(__name__)
 
@@ -15,43 +16,112 @@ __all__ = ['get_authentication_policy']
 
 
 def includeme(config):
-    log.info('Configuring.')
-    policy = config.registry.queryUtility(IContextBasedAuthenticationPolicy)
-    if policy is None:
+    try:
+        config.get_authentication_policy()
+    except AttributeError:
+        log.info('Configuring')
         ctx_policy = ContextBasedAuthenticationPolicy()
         config.set_authentication_policy(ctx_policy)
         # XXX Permit to override authorization policy via settings?
         config.set_authorization_policy(ACLAuthorizationPolicy())
         config.add_directive('register_authentication_policy',
-                             register_auth_policy,
+                             register_authentication_policy,
+                             action_wrap=True)
+        config.add_directive('get_authentication_policy',
+                             get_authentication_policy,
                              action_wrap=False)
         config.commit()
+        log.info('Configured')
+    else:
+        log.info('Already configured')
 
 
 class authentication_policy(object):
     """A decorator to register an authentication policy"""
 
-    def __init__(self, *context_cls_list):
-        self.context_cls_list = context_cls_list
+    def __init__(self, **settings):
+        if 'contexts' not in settings:
+            ConfigurationError('no contexts defined ')
+        self.__dict__.update(settings)
 
     def __call__(self, policy_cls):
-        self.policy_cls = policy_cls
-        self.info = venusian.attach(policy_cls, self.callback)
+        settings = self.__dict__.copy()
+        contexts = settings.pop('contexts')
+
+        def callback(context, name, ob):
+
+            config = context.config.with_package(info.module)
+            config.register_authentication_policy(policy_cls(), contexts,
+                                                  **settings)
+
+        info = venusian.attach(policy_cls, callback, depth=1)
+        settings['_info'] = info.codeinfo
         return policy_cls
 
-    def callback(self, context, name, ob):
-        config = context.config.with_package(self.info.module)
-        config.register_authentication_policy(self.policy_cls(),
-                                              self.context_cls_list)
 
+def register_authentication_policy(config, auth_policy, context_cls_list):
+    intr_category = 'context based authentication policies'
 
-def register_auth_policy(config, auth_policy, context_cls_list):
-    ctx_policy = config.registry.getUtility(IAuthenticationPolicy)
-    ctx_policy.register_policy(config, auth_policy, context_cls_list)
+    if any((
+        isinstance(context_cls_list, (unicode, str)),
+        not isinstance(context_cls_list, collections.Iterable),
+    )):
+        context_cls_list = (context_cls_list, )
+
+    context_cls_list = [config.maybe_dotted(ctx) for ctx in context_cls_list]
+
+    registry = config.registry
+    introspector = registry.introspector
+
+    def factory(context):
+        return auth_policy
+
+    def register(ctx):
+        # a policy can be overriden for a context
+        old_factory = registry.adapters.lookup([implementedBy(ctx)],
+                                               IAuthenticationPolicy)
+
+        if old_factory:
+            adapter = old_factory(None)
+            log.debug('unregister adapter=%s required=%s provided=%s',
+                      adapter, [ctx], IAuthenticationPolicy)
+
+            registry.unregisterAdapter(old_factory, required=[ctx],
+                                       provided=IAuthenticationPolicy)
+
+            policy_intr = introspector.get(intr_category, adapter)
+            if policy_intr:
+                policy_intr['contexts'].remove(ctx)
+                if not policy_intr['contexts']:
+                    introspector.remove(intr_category, adapter)
+
+        log.debug('register adapter=%s required=%s provided=%s',
+                  auth_policy, [ctx], IAuthenticationPolicy)
+
+        registry.registerAdapter(factory, required=[ctx],
+                                 provided=IAuthenticationPolicy)
+
+    # add introspectable for policy
+    policy_intr = introspector.get(intr_category, auth_policy)
+    if not policy_intr:
+        policy_intr = config.introspectable(
+            category_name=intr_category,
+            discriminator=auth_policy,
+            title=auth_policy,
+            type_name='authentication policy',
+        )
+        policy_intr['policy'] = auth_policy
+        policy_intr['contexts'] = []
+        log.debug('add introspectable %s', policy_intr)
+
+    policy_intr['contexts'].extend(context_cls_list)
+
+    for ctx in context_cls_list:
+        config.action(ctx, register, args=(ctx, ),
+                      introspectables=(policy_intr, ))
 
 
 def get_authentication_policy(config):
-    # XXX should received registry as param.
     return config.registry.getUtility(IAuthenticationPolicy)
 
 
@@ -63,41 +133,6 @@ class IContextBasedAuthenticationPolicy(IAuthenticationPolicy):
 
 @implementer(IContextBasedAuthenticationPolicy)
 class ContextBasedAuthenticationPolicy(CallbackAuthenticationPolicy):
-
-    intr_category = 'context based authentication policies'
-
-    def register_policy(self, config, auth_policy, context_cls_list):
-        log.debug('registering auth_policy=%s for %s', auth_policy,
-                  context_cls_list)
-
-        if not isinstance(context_cls_list, collections.Iterable):
-            context_cls_list = (context_cls_list, )
-
-        registry = config.registry
-        introspector = registry.introspector
-        policy_intr = introspector.get(self.intr_category, auth_policy)
-
-        if not policy_intr:
-            policy_intr = config.introspectable(
-                category_name=self.intr_category,
-                discriminator=auth_policy,
-                title=auth_policy,
-                type_name='authentication policy',
-            )
-            policy_intr['policy'] = auth_policy
-            policy_intr['contexts'] = []
-            config.action(None,
-                          introspectables=(policy_intr,),
-                          action_wrap=False)
-
-        policy_intr['contexts'].extend(context_cls_list)
-
-        def factory(context):
-            return auth_policy
-
-        for ctx in context_cls_list:
-            registry.registerAdapter(factory, required=[ctx],
-                                     provided=IAuthenticationPolicy)
 
     def _get_policy(self, request):
         registry = request.registry

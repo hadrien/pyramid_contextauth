@@ -32,7 +32,7 @@ Usage::
         pass
 
 
-    @authentication_policy(Context2, Context3)
+    @authentication_policy(contexts=(Context2, Context3))
     class ContextAuthenticationPolicy(object):
 
         def authenticated_userid(self, request):

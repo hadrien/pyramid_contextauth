@@ -1,6 +1,13 @@
 Changelog
 =========
 
+0.5
+---
+
+* Registering same context to multiple policies raises a configuration error.
+* Unregister old policy when overriding a context with another policy.
+* Change register_authentication_policy and authentication_policy signatures.
+
 0.4
 ---
 

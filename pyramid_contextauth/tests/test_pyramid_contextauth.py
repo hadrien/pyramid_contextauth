@@ -2,7 +2,10 @@ import unittest
 
 import mock
 
-from pyramid.config import Configurator
+from pyramid.config import Configurator, ConfigurationError
+from pyramid.interfaces import IAuthenticationPolicy
+
+from zope.interface import implementedBy
 
 
 class TestConfig(unittest.TestCase):
@@ -27,10 +30,11 @@ class TestPyramidContextAuth(unittest.TestCase):
 
     def setUp(self):
         self.config = Configurator(settings={})
+        self.config.include('pyramid_contextauth')
 
     def _get_policy(self):
-        from pyramid_contextauth import ContextBasedAuthenticationPolicy
-        return ContextBasedAuthenticationPolicy()
+        from pyramid_contextauth import get_authentication_policy
+        return get_authentication_policy(self.config)
 
     def _get_context_class(self, name):
         return type(name, (object, ), {})
@@ -54,7 +58,8 @@ class TestPyramidContextAuth(unittest.TestCase):
 
         policy = self._get_policy()
 
-        policy.register_policy(self.config, ctx_policy, A)
+        self.config.register_authentication_policy(ctx_policy, A)
+        self.config.commit()
 
         self.assertEqual(None, policy.authenticated_userid(request))
 
@@ -67,9 +72,8 @@ class TestPyramidContextAuth(unittest.TestCase):
 
         policy = self._get_policy()
 
-        policy.register_policy(self.config, ctx_policy, A)
-        # should call CallbackAuthenticationPolicy.authenticated_userid_method
-        # wich rely on unauthenticated_id (m1)
+        self.config.register_authentication_policy(ctx_policy, A)
+        self.config.commit()
 
         self.assertEqual(['system.Everyone'],
                          policy.effective_principals(request))
@@ -83,7 +87,8 @@ class TestPyramidContextAuth(unittest.TestCase):
 
         policy = self._get_policy()
 
-        policy.register_policy(self.config, ctx_policy, A)
+        self.config.register_authentication_policy(ctx_policy, A)
+        self.config.commit()
 
         self.assertEqual(ctx_policy.authenticated_userid.return_value,
                          policy.authenticated_userid(request))
@@ -102,7 +107,8 @@ class TestPyramidContextAuth(unittest.TestCase):
         ctx_policy.unauthenticated_userid.return_value = '123'
         ctx_policy.effective_principals.return_value = ['1234567']
 
-        policy.register_policy(self.config, ctx_policy, A)
+        self.config.register_authentication_policy(ctx_policy, A)
+        self.config.commit()
 
         expected = ['system.Everyone', 'system.Authenticated', '123',
                     '1234567']
@@ -119,9 +125,64 @@ class TestPyramidContextAuth(unittest.TestCase):
         ctx_policy.forget.return_value = ['Header']
         ctx_policy.remember.return_value = ['Header']
 
-        policy.register_policy(self.config, ctx_policy, A)
+        self.config.register_authentication_policy(ctx_policy, A)
+        self.config.commit()
 
         self.assertEqual(['Header'],
                          policy.remember(request,
                                          ['system.Everyone', '1234567']))
         self.assertEqual(['Header'], policy.forget(request))
+
+    def test_override_configuration_error(self):
+        A = self._get_context_class('A')
+
+        ctx_policy1 = mock.Mock()
+        ctx_policy2 = mock.Mock()
+
+        request = mock.Mock()
+        request.context = A()
+        request.registry = self.config.registry
+
+        self.config.register_authentication_policy(ctx_policy1, A)
+        self.config.register_authentication_policy(ctx_policy2, A)
+
+        with self.assertRaises(ConfigurationError):
+            self.config.commit()
+
+    def test_override(self):
+        A = self._get_context_class('A')
+
+        ctx_policy1 = mock.Mock()
+        ctx_policy2 = mock.Mock()
+
+        request = mock.Mock()
+        request.context = A()
+        request.registry = self.config.registry
+
+        registry = self.config.registry
+        introspector = registry.introspector
+        intr_category = 'context based authentication policies'
+
+        self.config.register_authentication_policy(ctx_policy1, A)
+        self.config.commit()
+
+        ctx_policy1_factory = registry.adapters.lookup([implementedBy(A)],
+                                                       IAuthenticationPolicy)
+
+        self.config.register_authentication_policy(ctx_policy2, A)
+        self.config.commit()
+
+        # Make sure ctx_policy1 is not looked up
+        adapter_factory = registry.adapters.lookup([implementedBy(A)],
+                                                   IAuthenticationPolicy)
+        self.assertIs(adapter_factory(None), ctx_policy2)
+
+        # Make sure ctx_policy1 does not appear in introspectable
+        intr = introspector.get(intr_category, ctx_policy1_factory)
+        self.assertIsNone(intr)
+
+        intr_category = introspector.get_category(intr_category)
+        self.assertEqual(1, len(intr_category))
+
+        intr = intr_category[0]['introspectable']
+        self.assertEqual(ctx_policy2, intr.discriminator)
