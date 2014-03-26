@@ -8,7 +8,9 @@ pyramid_contextauth
 .. image:: https://pypip.in/d/pyramid_contextauth/badge.png
    :target: https://crate.io/packages/pyramid_contextauth/
 
-A simple pyramid extension to provides contexts based authentication policy.
+A simple pyramid extension to register contexts based authentication policy.
+Introspectables for policies registered are added to configuration and will
+appear in debugtoolbar with their associated contexts.
 
 .. code-block:: python
 
