@@ -48,6 +48,11 @@ class TestConfig(unittest.TestCase):
         self.assertIsInstance(policy._get_policy(request),
                               example.Context345Policy)
 
+        root = example.Root()
+        request.context = root['child']
+        self.assertIsInstance(policy._get_policy(request),
+                              example.LocationAwarePolicy)
+
     def test_introspectables(self):
         config = Configurator(settings={})
         config.include('pyramid_contextauth')
@@ -59,5 +64,4 @@ class TestConfig(unittest.TestCase):
 
         category = introspector.get_category(category_name)
 
-        self.assertEqual(3, len(category))
-
+        self.assertEqual(4, len(category))

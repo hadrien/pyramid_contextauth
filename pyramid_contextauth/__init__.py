@@ -1,9 +1,10 @@
 import logging
 import collections
 
-from pyramid.interfaces import IAuthenticationPolicy
 from pyramid.authentication import CallbackAuthenticationPolicy
 from pyramid.authorization import ACLAuthorizationPolicy
+from pyramid.interfaces import IAuthenticationPolicy
+from pyramid.location import lineage
 
 from zope.interface import implementer, implementedBy
 
@@ -110,17 +111,24 @@ class ContextBasedAuthenticationPolicy(CallbackAuthenticationPolicy):
 
     def _get_policy(self, request):
         registry = request.registry
-        return registry.queryAdapter(request.context, IAuthenticationPolicy)
+        policy = None
+        for context in lineage(request.context):
+            policy = registry.queryAdapter(context, IAuthenticationPolicy)
+            if policy is not None:
+                break
+        return policy
 
     def _call_method(self, request, method_name, *args, **kwargs):
         policy = self._get_policy(request)
         if not policy:
+            log.debug('No authentication policy for context=%s',
+                      request.context)
             return None
         try:
             method = getattr(policy, method_name)
         except (KeyError, AttributeError):
-            log.debug('No authentication policy found: context=%s',
-                      request.context)
+            log.debug('No method: policy=%s method=%s context=%s',
+                      policy, method_name, request.context)
             return None
         return method(request, *args, **kwargs)
 
@@ -135,7 +143,6 @@ class ContextBasedAuthenticationPolicy(CallbackAuthenticationPolicy):
         try:
             return policy.authenticated_userid(request)
         except AttributeError:
-            log.debug('No policy for context=%s', request.context)
             parent = super(ContextBasedAuthenticationPolicy, self)
             return parent.authenticated_userid(request)
 

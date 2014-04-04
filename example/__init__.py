@@ -20,6 +20,8 @@ def includeme(config):
     config.register_authentication_policy(Context345Policy(),
                                           (Context3, Context4))
 
+    config.register_authentication_policy(LocationAwarePolicy(), Root)
+
     config.commit()
 
 
@@ -44,4 +46,25 @@ class Context5(Context4):
 
 
 class Context345Policy(object):
+    """To handle Context3, Context4 and Context5
+    """
+
+
+class ChildContext(object):
     pass
+
+
+class Root(object):
+    __name__ = ''
+    __parent__ = None
+
+    def __getitem__(self, key):
+        child = ChildContext()
+        child.__name__ = key
+        child.__parent__ = self
+        return child
+
+
+class LocationAwarePolicy(object):
+    """To handle Root and any of its children
+    """

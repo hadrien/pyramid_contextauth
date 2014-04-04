@@ -1,6 +1,12 @@
 Changelog
 =========
 
+0.7
+---
+
+* Policy checks on each resource lineage and get the first policy it gets.
+* Add coverall in after_success of travis config.
+
 0.6
 ---
 

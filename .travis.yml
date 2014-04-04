@@ -5,3 +5,5 @@ python:
 install: "pip install -r requirements-test.txt && python setup.py develop"
 # command to run tests, e.g. python setup.py test
 script:  "python setup.py nosetests"
+after_success:
+    - coveralls
