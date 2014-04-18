@@ -1,0 +1,7 @@
+[run]
+source = pyramid_contextauth
+
+[report]
+omit =
+    */python?.?/*
+    */site-packages/nose/*
