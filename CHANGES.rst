@@ -6,6 +6,7 @@ Changelog
 
 * Policy checks on each resource lineage and get the first policy it gets.
 * Add coverall in after_success of travis config.
+* Remove pyramid version constraints.
 
 0.6
 ---
